@@ -99,7 +99,24 @@ def get_today_records(token, today):
     数据量约 1300+ 条，API 翻页拉取耗时可控（<5秒）。
     """
     items = list_all_records(LOG_APP, LOG_TABLE, token)
-    return [it for it in items if _date_only(it.get("fields", {}).get("填写日期")) == today]
+    print(f"[debug] 全量拉取总记录数: {len(items)}")
+    if items:
+        first_fields = items[0].get("fields", {})
+        print(f"[debug] 首条记录字段名: {list(first_fields.keys())}")
+        # 打印前5条的填写日期值，方便定位格式问题
+        for i, it in enumerate(items[:5]):
+            fd = it.get("fields", {}).get("填写日期")
+            print(f"[debug] 记录{i} 填写日期原始值={fd!r} → _date_only={_date_only(fd)!r}")
+        # 统计所有出现的日期值（去重）
+        all_dates = set()
+        for it in items:
+            d = _date_only(it.get("fields", {}).get("填写日期"))
+            if d:
+                all_dates.add(d)
+        print(f"[debug] 所有出现过的日期(去重,共{len(all_dates)}个): {sorted(all_dates)}")
+    matched = [it for it in items if _date_only(it.get("fields", {}).get("填写日期")) == today]
+    print(f"[debug] 匹配今天({today})的记录数: {len(matched)}")
+    return matched
 
 
 def build_excel(records, today_label):

@@ -91,14 +91,25 @@ def list_all_records(app_token, table_id, token, page_size=100):
 
 
 def search_records_by_date(app_token, table_id, token, date_str, page_size=100):
+    """按日期范围服务端筛选（today 00:00:00 <= 填写日期 < 次日 00:00:00）。
+
+    飞书「填写日期」为日期时间型字段，返回带 ' 00:00:00' 后缀；用区间
+    筛选（>= 当日0点 且 < 次日0点）可稳定命中当天全部记录，无需全量拉取。
+    返回结果再用 _date_only 本地复核一次，双保险。
+    """
     url = f"{FEISHU_BASE}/bitable/v1/apps/{app_token}/tables/{table_id}/records/search"
+    y, m, d = (int(x) for x in date_str.split("-"))
+    nxt = datetime.date(y, m, d) + datetime.timedelta(days=1)
+    start = f"{date_str} 00:00:00"
+    end = nxt.strftime("%Y-%m-%d") + " 00:00:00"
     out, page_token = [], ""
     while True:
         body = {
             "filter": {
                 "conjunction": "and",
                 "conditions": [
-                    {"field_name": "填写日期", "operator": "is", "value": [date_str]}
+                    {"field_name": "填写日期", "operator": ">=", "value": [start]},
+                    {"field_name": "填写日期", "operator": "<", "value": [end]},
                 ],
             },
             "page_size": page_size,
@@ -121,11 +132,14 @@ def search_records_by_date(app_token, table_id, token, date_str, page_size=100):
 def get_today_records(token, today):
     """当天填报记录列表。
 
-    直接全量拉取后按日期本地过滤——避免依赖服务端 'is' 日期筛选：
-    飞书「填写日期」字段经 API 返回带时分秒('2026-07-28 00:00:00')，
-    服务端 'is' + 纯日期值往往匹配不到，导致漏判为'暂无填写'。
+    优先服务端按日期范围筛选（只取当天，省去全量拉取）；
+    若服务端筛选抛异常，则回退全量拉取 + 本地 _date_only 过滤兜底。
     """
-    items = list_all_records(LOG_APP, LOG_TABLE, token)
+    try:
+        items = search_records_by_date(LOG_APP, LOG_TABLE, token, today)
+    except Exception as e:  # noqa: BLE001
+        print(f"[warn] 服务端日期筛选失败，回退全量拉取本地过滤: {e}")
+        items = list_all_records(LOG_APP, LOG_TABLE, token)
     return [it for it in items if _date_only(it.get("fields", {}).get("填写日期")) == today]
 
 

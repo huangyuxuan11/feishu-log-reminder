@@ -188,9 +188,9 @@ def main():
         names_raw.append(name)
         notes[name] = _norm(f.get("备注"))
     # 备注含"休假"视为当天不在岗，免提醒
-    on_leave = sorted({n for n in names_raw if "休假" in (notes.get(n) or "")})
-    expected = sorted({n for n in names_raw} - on_leave - {""})
-    print(f"[info] 名单 {len(names_raw)} 条，应提醒 {len(expected)} 人，休假免提醒 {len(on_leave)} 人：{on_leave}")
+    on_leave = {n for n in names_raw if "休假" in (notes.get(n) or "")}
+    expected = sorted(set(names_raw) - on_leave - {""})
+    print(f"[info] 名单 {len(names_raw)} 条，应提醒 {len(expected)} 人，休假免提醒 {len(on_leave)} 人：{sorted(on_leave)}")
 
     # 2) 已填（当天）
     filled = get_filled_names_today(token, today)
@@ -203,7 +203,7 @@ def main():
         msg = (f"【客户经理日志未填提醒】{today_label} 有 {len(unfilled)} 人未填\n"
                f"{lines}")
         if on_leave:
-            msg += f"\n\n（备注含“休假”免提醒 {len(on_leave)} 人：{', '.join(on_leave)}）"
+            msg += f"\n\n（备注含“休假”免提醒 {len(on_leave)} 人：{', '.join(sorted(on_leave))}）"
         msg += "\n\n请尽快在飞书补填今日日志。"
     else:
         extra = f"（备注含“休假”免提醒 {len(on_leave)} 人）" if on_leave else ""

@@ -115,8 +115,8 @@ def search_records_by_date(app_token, table_id, token, date_str, page_size=100):
             "filter": {
                 "conjunction": "and",
                 "conditions": [
-                    {"field_name": "填写日期", "operator": ">=", "value": [start]},
-                    {"field_name": "填写日期", "operator": "<", "value": [end]},
+                    {"field_name": "填写日期", "operator": "isGreater", "value": [start]},
+                    {"field_name": "填写日期", "operator": "isLess", "value": [end]},
                 ],
             },
             "page_size": page_size,

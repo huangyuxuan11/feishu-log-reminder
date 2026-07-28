@@ -8,13 +8,16 @@
   2. 读取「客户经理名单」多维表格 -> 应填日志的客户经理名单(约31人)
   3. 读取「客户经理日志统计」多维表格，筛选当天(填写日期==今天) -> 已填集合
   4. 差集 = 今天未填的人
-  5. 通过飞书群机器人 webhook(HMAC-SHA256 签名) 把结果推到手机
+  5. 用同一自建应用，通过「发送消息」接口给你发一条飞书私信(单聊)
+
+无需建群、无需群机器人 webhook。只要在飞书自建应用里打开「发送消息」权限，
+并把应用加为两张表的协作者即可。
 
 环境变量(强烈建议放 GitHub Secrets，不要写死在仓库里)：
   FEISHU_APP_ID          飞书自建应用 app_id
   FEISHU_APP_SECRET      飞书自建应用 app_secret
-  FEISHU_WEBHOOK         飞书群机器人 webhook 地址
-  FEISHU_WEBHOOK_SECRET  飞书群机器人签名密钥(建议开启，防伪造)
+  FEISHU_USER_OPEN_ID    接收提醒的飞书用户 open_id (你的 open_id；
+                        也可用 FEISHU_USER_ID + FEISHU_RECEIVE_ID_TYPE=user_id 指定工号)
 
 说明：脚本不依赖本地 lark-cli，全部走飞书开放 API，适合在无头云端(CI)运行。
 """
@@ -22,9 +25,6 @@ import os
 import sys
 import time
 import json
-import hmac
-import hashlib
-import base64
 import datetime
 import requests
 
@@ -138,29 +138,36 @@ def extract_name(fields):
     return ""
 
 
-def send_webhook(webhook, secret, text):
-    ts = str(int(time.time()))
-    sign = ""
-    if secret:
-        string_to_sign = ts + "\n" + secret
-        hmac_code = hmac.new(secret.encode("utf-8"), string_to_sign.encode("utf-8"),
-                             digestmod=hashlib.sha256).digest()
-        sign = base64.b64encode(hmac_code).decode("utf-8")
-    payload = {"msg_type": "text", "content": {"text": text}, "timestamp": ts}
-    if sign:
-        payload["sign"] = sign
-    r = requests.post(webhook, json=payload, timeout=15)
+def send_app_message(token, receive_id, receive_id_type, text):
+    """用自建应用给指定用户发一条飞书私信(单聊消息)。无需建群。"""
+    url = f"{FEISHU_BASE}/im/v1/messages"
+    params = {"receive_id_type": receive_id_type}
+    body = {
+        "receive_id": receive_id,
+        "msg_type": "text",
+        "content": json.dumps({"text": text}, ensure_ascii=False),
+    }
+    r = requests.post(url, headers={"Authorization": f"Bearer {token}"},
+                      params=params, json=body, timeout=15)
     return r.json()
 
 
 def main():
     app_id = os.environ.get("FEISHU_APP_ID")
     app_secret = os.environ.get("FEISHU_APP_SECRET")
-    webhook = os.environ.get("FEISHU_WEBHOOK")
-    secret = os.environ.get("FEISHU_WEBHOOK_SECRET", "")
+    user_open_id = os.environ.get("FEISHU_USER_OPEN_ID")
+    user_id = os.environ.get("FEISHU_USER_ID")
+
+    # 接收人：优先用 open_id；若提供工号则回退到 user_id
+    if user_open_id:
+        receive_id, receive_id_type = user_open_id, "open_id"
+    elif user_id:
+        receive_id, receive_id_type = user_id, "user_id"
+    else:
+        receive_id, receive_id_type = None, None
 
     missing = [k for k, v in (("FEISHU_APP_ID", app_id), ("FEISHU_APP_SECRET", app_secret),
-                              ("FEISHU_WEBHOOK", webhook)) if not v]
+                              ("接收人(FEISHU_USER_OPEN_ID 或 FEISHU_USER_ID)", receive_id)) if not v]
     if missing:
         raise SystemExit(f"缺少环境变量: {', '.join(missing)}。请在 GitHub Secrets 中配置。")
 
@@ -188,8 +195,8 @@ def main():
         msg = f"✅ {today_label} 客户经理日志全员已填（应填 {len(expected)} 人）。"
 
     print(msg)  # 同时写进 Actions 日志，方便排查
-    resp = send_webhook(webhook, secret, msg)
-    print("webhook 返回:", resp)
+    resp = send_app_message(token, receive_id, receive_id_type, msg)
+    print("发送返回:", resp)
 
 
 if __name__ == "__main__":

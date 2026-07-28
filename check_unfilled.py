@@ -177,9 +177,20 @@ def main():
 
     token = get_tenant_token(app_id, app_secret)
 
-    # 1) 应填名单
+    # 1) 应填名单（结合名单表「备注」：备注含"休假"当天免提醒）
     roster = list_all_records(ROSTER_APP, ROSTER_TABLE, token)
-    expected = sorted({extract_name(it.get("fields", {})) for it in roster} - {""})
+    names_raw, notes = [], {}
+    for it in roster:
+        f = it.get("fields", {})
+        name = extract_name(f)
+        if not name:
+            continue
+        names_raw.append(name)
+        notes[name] = _norm(f.get("备注"))
+    # 备注含"休假"视为当天不在岗，免提醒
+    on_leave = sorted({n for n in names_raw if "休假" in (notes.get(n) or "")})
+    expected = sorted({n for n in names_raw} - on_leave - {""})
+    print(f"[info] 名单 {len(names_raw)} 条，应提醒 {len(expected)} 人，休假免提醒 {len(on_leave)} 人：{on_leave}")
 
     # 2) 已填（当天）
     filled = get_filled_names_today(token, today)
@@ -190,9 +201,13 @@ def main():
     if unfilled:
         lines = "\n".join(f"• {n}" for n in unfilled)
         msg = (f"【客户经理日志未填提醒】{today_label} 有 {len(unfilled)} 人未填\n"
-               f"{lines}\n\n请尽快在飞书补填今日日志。")
+               f"{lines}")
+        if on_leave:
+            msg += f"\n\n（备注含“休假”免提醒 {len(on_leave)} 人：{', '.join(on_leave)}）"
+        msg += "\n\n请尽快在飞书补填今日日志。"
     else:
-        msg = f"✅ {today_label} 客户经理日志全员已填（应填 {len(expected)} 人）。"
+        extra = f"（备注含“休假”免提醒 {len(on_leave)} 人）" if on_leave else ""
+        msg = f"✅ {today_label} 客户经理日志全员已填（应填 {len(expected)} 人）{extra}。"
 
     print(msg)  # 同时写进 Actions 日志，方便排查
     resp = send_app_message(token, receive_id, receive_id_type, msg)

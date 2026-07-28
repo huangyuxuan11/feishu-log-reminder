@@ -6,7 +6,7 @@
 逻辑：
   1. 用飞书自建应用的 app_id/app_secret 换取 tenant_access_token
   2. 读取「客户经理日志统计」多维表格，筛选当天(填写日期==今天)的记录
-  3. 把当天所有填报记录导出为 Excel（与原表字段一致：编号/填写日期/客户经理姓名/工作时间1-15/工作内容1-15）
+  3. 把当天所有填报记录导出为 Excel（列：填写日期/客户经理姓名/工作时间1/工作内容1/工作时间2/工作内容2…，时段成对交叉）
   4. 通过飞书自建应用，把 Excel 作为文件私信发给你（亦非fan）
 
 环境变量(放 GitHub Secrets)：
@@ -22,7 +22,6 @@ import os
 import io
 import re
 import json
-import re
 import time
 import datetime
 import requests
@@ -130,33 +129,27 @@ def get_today_records(token, today):
     return [it for it in items if _date_only(it.get("fields", {}).get("填写日期")) == today]
 
 
-def order_time_content_keys(fields_union):
-    """把 工作时间N / 工作内容N 按键名里的数字排序，保证列顺序稳定。"""
-    time_keys, content_keys = [], []
-    for k in fields_union:
-        m = re.match(r"^工作时间(\d+)$", k)
-        if m:
-            time_keys.append((int(m.group(1)), k))
-            continue
-        m = re.match(r"^工作内容(\d+)$", k)
-        if m:
-            content_keys.append((int(m.group(1)), k))
-    time_keys.sort()
-    content_keys.sort()
-    return [k for _, k in time_keys], [k for _, k in content_keys]
-
-
 def build_excel(records, today_label):
     import openpyxl
     from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 
-    fields_union = set()
+    # 找出最大的时段序号 N（字段形如 工作时间N / 工作内容N）
+    max_n = 0
     for it in records:
-        fields_union.update(it.get("fields", {}).keys())
-    time_keys, content_keys = order_time_content_keys(fields_union)
+        for k in it.get("fields", {}):
+            m = re.match(r"^工作时间(\d+)$", k)
+            if m:
+                max_n = max(max_n, int(m.group(1)))
+                continue
+            m = re.match(r"^工作内容(\d+)$", k)
+            if m:
+                max_n = max(max_n, int(m.group(1)))
 
-    fixed = ["编号", "填写日期", "客户经理姓名"]
-    headers = fixed + time_keys + content_keys
+    # 多列、成对交叉：填写日期/客户经理姓名/工作时间1/工作内容1/工作时间2/工作内容2/...
+    headers = ["填写日期", "客户经理姓名"]
+    for n in range(1, max_n + 1):
+        headers.append(f"工作时间{n}")
+        headers.append(f"工作内容{n}")
 
     wb = openpyxl.Workbook()
     ws = wb.active
@@ -177,29 +170,25 @@ def build_excel(records, today_label):
     # 数据行
     for r, it in enumerate(records, 2):
         f = it.get("fields", {})
-        row_vals = []
-        row_vals.append(_norm(f.get("编号")))
-        row_vals.append(_norm(f.get("填写日期")))
-        row_vals.append(_norm(f.get("客户经理姓名")))
-        for k in time_keys:
-            row_vals.append(_norm(f.get(k)))
-        for k in content_keys:
-            row_vals.append(_norm(f.get(k)))
+        row_vals = [_norm(f.get("填写日期")), _norm(f.get("客户经理姓名"))]
+        for n in range(1, max_n + 1):
+            row_vals.append(_norm(f.get(f"工作时间{n}")))
+            row_vals.append(_norm(f.get(f"工作内容{n}")))
         for c, v in enumerate(row_vals, 1):
             cell = ws.cell(row=r, column=c, value=v)
             cell.alignment = Alignment(vertical="top", wrap_text=True)
             cell.border = border
 
     # 列宽
-    ws.column_dimensions["A"].width = 8
-    ws.column_dimensions["B"].width = 13
-    ws.column_dimensions["C"].width = 12
-    for i in range(len(time_keys)):
-        ws.column_dimensions[openpyxl.utils.get_column_letter(4 + i)].width = 14
-    for i in range(len(content_keys)):
-        ws.column_dimensions[openpyxl.utils.get_column_letter(4 + len(time_keys) + i)].width = 40
+    ws.column_dimensions["A"].width = 13
+    ws.column_dimensions["B"].width = 12
+    for n in range(1, max_n + 1):
+        tcol = 3 + (n - 1) * 2
+        ccol = tcol + 1
+        ws.column_dimensions[openpyxl.utils.get_column_letter(tcol)].width = 16
+        ws.column_dimensions[openpyxl.utils.get_column_letter(ccol)].width = 40
 
-    ws.freeze_panes = "A2"
+    ws.freeze_panes = "C2"
 
     buf = io.BytesIO()
     wb.save(buf)

@@ -127,16 +127,14 @@ def search_records_by_date(app_token, table_id, token, date_str, page_size=100):
 
 
 def get_filled_names_today(token, today):
-    """当天已填姓名集合；优先服务端筛选，失败或无结果则全量拉取本地过滤(更稳)。"""
-    items = []
-    try:
-        items = search_records_by_date(LOG_APP, LOG_TABLE, token, today)
-    except Exception as e:  # noqa: BLE001
-        print(f"[warn] 服务端日期筛选失败，改为全量拉取后本地过滤: {e}")
-    if not items:
-        # 服务端筛选无结果（可能日期格式/时区不匹配），兜底全量拉取后再本地过滤
-        print("[info] 服务端筛选无命中，改为全量拉取后本地按日期过滤。")
-        items = list_all_records(LOG_APP, LOG_TABLE, token)
+    """当天已填姓名集合。
+
+    直接全量拉取后按日期本地过滤——避免依赖服务端 'is' 日期筛选：
+    飞书「填写日期」字段经 API 返回带时分秒('2026-07-28 00:00:00')，
+    服务端 'is' + 纯日期值往往匹配不到，导致漏判。本地用 _date_only
+    只取日期部分比较，稳定可靠（表数据量小，全量拉取无压力）。
+    """
+    items = list_all_records(LOG_APP, LOG_TABLE, token)
     names = set()
     for item in items:
         f = item.get("fields", {})

@@ -120,11 +120,13 @@ def search_records_by_date(app_token, table_id, token, date_str, page_size=100):
 
 
 def get_today_records(token, today):
-    try:
-        items = search_records_by_date(LOG_APP, LOG_TABLE, token, today)
-    except Exception as e:  # noqa: BLE001
-        print(f"[warn] 服务端日期筛选失败，改为全量拉取后本地过滤: {e}")
-        items = list_all_records(LOG_APP, LOG_TABLE, token)
+    """当天填报记录列表。
+
+    直接全量拉取后按日期本地过滤——避免依赖服务端 'is' 日期筛选：
+    飞书「填写日期」字段经 API 返回带时分秒('2026-07-28 00:00:00')，
+    服务端 'is' + 纯日期值往往匹配不到，导致漏判为'暂无填写'。
+    """
+    items = list_all_records(LOG_APP, LOG_TABLE, token)
     return [it for it in items if _date_only(it.get("fields", {}).get("填写日期")) == today]
 
 

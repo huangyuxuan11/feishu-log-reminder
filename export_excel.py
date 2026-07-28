@@ -22,6 +22,7 @@ import os
 import io
 import re
 import json
+import re
 import time
 import datetime
 import requests
@@ -54,6 +55,22 @@ def _norm(v):
                 return str(v[k])
         return str(v)
     return str(v)
+
+
+_DATE_RE = re.compile(r"(\d{4}-\d{2}-\d{2})")
+
+
+def _date_only(v):
+    """从飞书日期字段值中提取 YYYY-MM-DD。
+
+    飞书日期字段经 API 返回可能是 '2026-07-28 00:00:00'（带时分秒）、
+    '2026-07-28'（纯日期）或 {'date': '2026-07-28'}（带结构），此处统一
+    只取日期部分，避免与 today='2026-07-28' 做严格相等时因 ' 00:00:00'
+    后缀而匹配失败。
+    """
+    s = _norm(v)
+    m = _DATE_RE.search(s)
+    return m.group(1) if m else s.strip()
 
 
 def list_all_records(app_token, table_id, token, page_size=100):
@@ -94,7 +111,7 @@ def search_records_by_date(app_token, table_id, token, date_str, page_size=100):
         if data.get("code") != 0:
             raise RuntimeError(f"筛选记录失败: {data}")
         for item in data.get("data", {}).get("items", []):
-            if _norm(item.get("fields", {}).get("填写日期")) == date_str:
+            if _date_only(item.get("fields", {}).get("填写日期")) == date_str:
                 out.append(item)
         if not data.get("data", {}).get("has_more") or not data.get("data", {}).get("page_token"):
             break
@@ -108,7 +125,7 @@ def get_today_records(token, today):
     except Exception as e:  # noqa: BLE001
         print(f"[warn] 服务端日期筛选失败，改为全量拉取后本地过滤: {e}")
         items = list_all_records(LOG_APP, LOG_TABLE, token)
-    return [it for it in items if _norm(it.get("fields", {}).get("填写日期")) == today]
+    return [it for it in items if _date_only(it.get("fields", {}).get("填写日期")) == today]
 
 
 def order_time_content_keys(fields_union):

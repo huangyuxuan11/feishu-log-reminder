@@ -99,17 +99,19 @@ def search_records_by_date(app_token, table_id, token, date_str, page_size=100):
     """
     url = f"{FEISHU_BASE}/bitable/v1/apps/{app_token}/tables/{table_id}/records/search"
     y, m, d = (int(x) for x in date_str.split("-"))
-    nxt = datetime.date(y, m, d) + datetime.timedelta(days=1)
-    start = f"{date_str} 00:00:00"
-    end = nxt.strftime("%Y-%m-%d") + " 00:00:00"
+    start_dt = datetime.datetime(y, m, d, tzinfo=BJT)
+    end_dt = start_dt + datetime.timedelta(days=1)
+    # 飞书日期时间型字段范围筛选，value 必须用毫秒时间戳（不支持日期字符串）
+    start_ts = int(start_dt.timestamp() * 1000)
+    end_ts = int(end_dt.timestamp() * 1000)
     out, page_token = [], ""
     while True:
         body = {
             "filter": {
                 "conjunction": "and",
                 "conditions": [
-                    {"field_name": "填写日期", "operator": "isGreater", "value": [start]},
-                    {"field_name": "填写日期", "operator": "isLess", "value": [end]},
+                    {"field_name": "填写日期", "operator": "isGreater", "value": [start_ts]},
+                    {"field_name": "填写日期", "operator": "isLess", "value": [end_ts]},
                 ],
             },
             "page_size": page_size,

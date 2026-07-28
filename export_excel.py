@@ -62,14 +62,34 @@ _DATE_RE = re.compile(r"(\d{4}-\d{2}-\d{2})")
 def _date_only(v):
     """从飞书日期字段值中提取 YYYY-MM-DD。
 
-    飞书日期字段经 API 返回可能是 '2026-07-28 00:00:00'（带时分秒）、
-    '2026-07-28'（纯日期）或 {'date': '2026-07-28'}（带结构），此处统一
-    只取日期部分，避免与 today='2026-07-28' 做严格相等时因 ' 00:00:00'
-    后缀而匹配失败。
+    飞书日期时间型字段经开放 API 返回格式不固定：
+      - 整数/浮点毫秒时间戳（如 1785168000000）→ 按 BJT 时区转 datetime
+      - 字符串 '2026-07-28 00:00:00' / '2026-07-28' → 正则提取日期部分
+      - dict {'date': ...} / list [...] → 取内部值
+    统一返回 'YYYY-MM-DD'，用于与 today 字符串比较。
     """
-    s = _norm(v)
-    m = _DATE_RE.search(s)
-    return m.group(1) if m else s.strip()
+    # dict / list 展开
+    if isinstance(v, dict):
+        for k in ("date", "start"):
+            if k in v:
+                v = v[k]
+                break
+    if isinstance(v, list):
+        v = v[0] if v else ""
+    # 整数/浮点 → 视为毫秒时间戳
+    if isinstance(v, bool):
+        pass
+    elif isinstance(v, (int, float)):
+        try:
+            return datetime.datetime.fromtimestamp(v / 1000, tz=BJT).strftime("%Y-%m-%d")
+        except (ValueError, OSError, OverflowError):
+            return str(v)
+    s = _norm(v) if not isinstance(v, str) else v
+    if isinstance(s, str):
+        s = s.strip()
+        m = _DATE_RE.search(s)
+        return m.group(1) if m else s
+    return str(v)
 
 
 def list_all_records(app_token, table_id, token, page_size=100):
@@ -100,20 +120,6 @@ def get_today_records(token, today):
     """
     items = list_all_records(LOG_APP, LOG_TABLE, token)
     print(f"[debug] 全量拉取总记录数: {len(items)}")
-    if items:
-        first_fields = items[0].get("fields", {})
-        print(f"[debug] 首条记录字段名: {list(first_fields.keys())}")
-        # 打印前5条的填写日期值，方便定位格式问题
-        for i, it in enumerate(items[:5]):
-            fd = it.get("fields", {}).get("填写日期")
-            print(f"[debug] 记录{i} 填写日期原始值={fd!r} → _date_only={_date_only(fd)!r}")
-        # 统计所有出现的日期值（去重）
-        all_dates = set()
-        for it in items:
-            d = _date_only(it.get("fields", {}).get("填写日期"))
-            if d:
-                all_dates.add(d)
-        print(f"[debug] 所有出现过的日期(去重,共{len(all_dates)}个): {sorted(all_dates)}")
     matched = [it for it in items if _date_only(it.get("fields", {}).get("填写日期")) == today]
     print(f"[debug] 匹配今天({today})的记录数: {len(matched)}")
     return matched
@@ -160,7 +166,7 @@ def build_excel(records, today_label):
     # 数据行
     for r, it in enumerate(records, 2):
         f = it.get("fields", {})
-        row_vals = [_norm(f.get("填写日期")), _norm(f.get("客户经理姓名"))]
+        row_vals = [_date_only(f.get("填写日期")), _norm(f.get("客户经理姓名"))]
         for n in range(1, max_n + 1):
             row_vals.append(_norm(f.get(f"工作时间{n}")))
             row_vals.append(_norm(f.get(f"工作内容{n}")))

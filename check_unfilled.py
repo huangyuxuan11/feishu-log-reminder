@@ -68,14 +68,34 @@ _DATE_RE = re.compile(r"(\d{4}-\d{2}-\d{2})")
 def _date_only(v):
     """从飞书日期字段值中提取 YYYY-MM-DD。
 
-    飞书日期字段经 API 返回可能是 '2026-07-28 00:00:00'（带时分秒）、
-    '2026-07-28'（纯日期）或 {'date': '2026-07-28'}（带结构），此处统一
-    只取日期部分，避免与 today='2026-07-28' 做严格相等时因 ' 00:00:00'
-    后缀而匹配失败。
+    飞书日期时间型字段经开放 API 返回格式不固定：
+      - 整数/浮点毫秒时间戳（如 1785168000000）→ 按 BJT 时区转 datetime
+      - 字符串 '2026-07-28 00:00:00' / '2026-07-28' → 正则提取日期部分
+      - dict {'date': ...} / list [...] → 取内部值
+    统一返回 'YYYY-MM-DD'，用于与 today 字符串比较。
     """
-    s = _norm(v)
-    m = _DATE_RE.search(s)
-    return m.group(1) if m else s.strip()
+    # dict / list 展开
+    if isinstance(v, dict):
+        for k in ("date", "start"):
+            if k in v:
+                v = v[k]
+                break
+    if isinstance(v, list):
+        v = v[0] if v else ""
+    # 整数/浮点 → 视为毫秒时间戳
+    if isinstance(v, bool):
+        pass
+    elif isinstance(v, (int, float)):
+        try:
+            return datetime.datetime.fromtimestamp(v / 1000, tz=BJT).strftime("%Y-%m-%d")
+        except (ValueError, OSError, OverflowError):
+            return str(v)
+    s = _norm(v) if not isinstance(v, str) else v
+    if isinstance(s, str):
+        s = s.strip()
+        m = _DATE_RE.search(s)
+        return m.group(1) if m else s
+    return str(v)
 
 
 def list_all_records(app_token, table_id, token, page_size=100):

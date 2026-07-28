@@ -97,58 +97,14 @@ def list_all_records(app_token, table_id, token, page_size=100):
     return out
 
 
-def search_records_by_date(app_token, table_id, token, date_str, page_size=100):
-    """按日期范围服务端筛选（today 00:00:00 <= 填写日期 < 次日 00:00:00）。
-
-    飞书「填写日期」为日期时间型字段，返回带 ' 00:00:00' 后缀；用区间
-    筛选（>= 当日0点 且 < 次日0点）可稳定命中当天全部记录，无需全量拉取。
-    返回结果再用 _date_only 本地复核一次，双保险。
-    """
-    url = f"{FEISHU_BASE}/bitable/v1/apps/{app_token}/tables/{table_id}/records/search"
-    y, m, d = (int(x) for x in date_str.split("-"))
-    start_dt = datetime.datetime(y, m, d, tzinfo=BJT)
-    end_dt = start_dt + datetime.timedelta(days=1)
-    # 飞书日期时间型字段范围筛选，value 必须用毫秒时间戳（不支持日期字符串）
-    start_ts = int(start_dt.timestamp() * 1000)
-    end_ts = int(end_dt.timestamp() * 1000)
-    out, page_token = [], ""
-    while True:
-        body = {
-            "filter": {
-                "conjunction": "and",
-                "conditions": [
-                    {"field_name": "填写日期", "operator": "isGreater", "value": [start_ts]},
-                    {"field_name": "填写日期", "operator": "isLess", "value": [end_ts]},
-                ],
-            },
-            "page_size": page_size,
-        }
-        if page_token:
-            body["page_token"] = page_token
-        r = requests.post(url, headers={"Authorization": f"Bearer {token}"}, json=body, timeout=20)
-        data = r.json()
-        if data.get("code") != 0:
-            raise RuntimeError(f"筛选记录失败 ({app_token}/{table_id}): {data}")
-        for item in data.get("data", {}).get("items", []):
-            if _date_only(item.get("fields", {}).get("填写日期")) == date_str:
-                out.append(item)
-        if not data.get("data", {}).get("has_more") or not data.get("data", {}).get("page_token"):
-            break
-        page_token = data["data"]["page_token"]
-    return out
-
-
 def get_filled_names_today(token, today):
     """当天已填姓名集合。
 
-    优先服务端按日期范围筛选（只取当天，省去全量拉取）；
-    若服务端筛选抛异常，则回退全量拉取 + 本地 _date_only 过滤兜底。
+    飞书日期时间型字段的服务端筛选(isGreater/isLess)对 value 格式要求苛刻
+    且文档不明确，多次尝试均报 InvalidFilter。
+    故采用稳定策略：全量拉取 + 本地 _date_only 过滤。
     """
-    try:
-        items = search_records_by_date(LOG_APP, LOG_TABLE, token, today)
-    except Exception as e:  # noqa: BLE001
-        print(f"[warn] 服务端日期筛选失败，回退全量拉取本地过滤: {e}")
-        items = list_all_records(LOG_APP, LOG_TABLE, token)
+    items = list_all_records(LOG_APP, LOG_TABLE, token)
     names = set()
     for item in items:
         f = item.get("fields", {})

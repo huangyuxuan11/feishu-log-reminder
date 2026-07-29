@@ -110,6 +110,87 @@ def list_all_records(app_token, table_id, token, page_size=100):
     return out
 
 
+# ---------- 去重控制表（避免飞书自动化 与 GitHub 自带定时器 双触发导致重复发文件） ----------
+CONTROL_APP = "H0qGbDCJiaMXQJss7xOcvTYEnsh"   # 日志提醒去重控制
+CONTROL_TABLE = "tbleEVzbXaicZ19E"
+
+# 北京时间各触发档位（与飞书自动化 / GitHub schedule 一致）
+SLOTS = [(2000, 20, 0), (2030, 20, 30), (2045, 20, 45), (2130, 21, 30)]
+
+
+def get_slot(now):
+    """返回当前时间最接近的档位 key（±20 分钟内），否则 None（如手动测试）。"""
+    cur = now.hour * 60 + now.minute
+    best, best_diff = None, 999
+    for key, h, m in SLOTS:
+        diff = abs(cur - (h * 60 + m))
+        if diff < best_diff:
+            best, best_diff = key, diff
+    return best if best_diff <= 20 else None
+
+
+def _create_record(app_token, table_id, fields, token):
+    url = f"{FEISHU_BASE}/bitable/v1/apps/{app_token}/tables/{table_id}/records"
+    r = requests.post(url, headers={"Authorization": f"Bearer {token}"}, json={"fields": fields}, timeout=20)
+    data = r.json()
+    if data.get("code") != 0:
+        raise RuntimeError(f"创建记录失败: {data}")
+    return data.get("data", {}).get("record")
+
+
+def _update_record(app_token, table_id, record_id, fields, token):
+    url = f"{FEISHU_BASE}/bitable/v1/apps/{app_token}/tables/{table_id}/records/{record_id}"
+    r = requests.post(url, headers={"Authorization": f"Bearer {token}"}, json={"fields": fields}, timeout=20)
+    data = r.json()
+    if data.get("code") != 0:
+        raise RuntimeError(f"更新记录失败: {data}")
+    return data
+
+
+def _find_control_record(records, task):
+    for it in records:
+        raw = _norm(it.get("fields", {}).get("文本"))
+        if raw.startswith(f"{task}|"):
+            return it, raw
+    return None, ""
+
+
+def read_fired_slots(token, task, today):
+    """读取该任务今天已发送的档位集合；异常时返回空集（fail-open，不阻断发送）。"""
+    try:
+        records = list_all_records(CONTROL_APP, CONTROL_TABLE, token)
+        it, raw = _find_control_record(records, task)
+        if it and raw:
+            parts = raw.split("|")
+            if len(parts) >= 3 and parts[1] == today:
+                return set(p for p in parts[2].split(",") if p)
+    except Exception as e:
+        print(f"[dedup] 读取控制表失败(忽略，继续发送): {e}")
+    return set()
+
+
+def mark_slot_fired(token, task, today, slot):
+    """标记该任务今天某档位已发送；异常时仅记录（fail-open）。"""
+    try:
+        records = list_all_records(CONTROL_APP, CONTROL_TABLE, token)
+        it, raw = _find_control_record(records, task)
+        if it:
+            rec_id = it.get("record_id") or it.get("id")
+            parts = raw.split("|")
+            if len(parts) >= 3 and parts[1] == today:
+                slots = set(p for p in parts[2].split(",") if p)
+                slots.add(str(slot))
+                _update_record(CONTROL_APP, CONTROL_TABLE, rec_id,
+                               {"文本": f"{task}|{today}|{','.join(sorted(slots))}"}, token)
+            else:
+                _update_record(CONTROL_APP, CONTROL_TABLE, rec_id,
+                               {"文本": f"{task}|{today}|{slot}"}, token)
+        else:
+            _create_record(CONTROL_APP, CONTROL_TABLE, {"文本": f"{task}|{today}|{slot}"}, token)
+    except Exception as e:
+        print(f"[dedup] 写入控制表失败(忽略): {e}")
+
+
 def get_today_records(token, today):
     """当天填报记录列表。
 
@@ -241,6 +322,14 @@ def main():
     today_label = now.strftime("%Y年%m月%d日")
 
     token = get_tenant_token(app_id, app_secret)
+
+    # 去重：若本档位今日已由另一触发器（飞书自动化 / GitHub 自带定时器）导出过，跳过防重复
+    slot = get_slot(now)
+    if slot is not None:
+        if str(slot) in read_fired_slots(token, "export", today):
+            print(f"[dedup] 档位 {slot} 今日已导出，跳过（防重复）")
+            return
+
     records = get_today_records(token, today)
     print(f"[info] 当天({today})填报记录数: {len(records)}")
 
@@ -249,6 +338,8 @@ def main():
         print(msg)
         resp = send_text_message(token, open_id, msg)
         print("text 返回:", resp)
+        if slot is not None:
+            mark_slot_fired(token, "export", today, slot)
         return
 
     buf = build_excel(records, today_label)
@@ -262,6 +353,8 @@ def main():
     resp = send_file_message(token, open_id, file_key)
     print("file 返回:", resp)
     print(f"✅ 已发送 {file_name}")
+    if slot is not None:
+        mark_slot_fired(token, "export", today, slot)
 
 
 if __name__ == "__main__":

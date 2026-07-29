@@ -387,13 +387,19 @@ def build_stats(today, roster_items, log_items):
 
     total_segs = sum(p["segs"] for p in submitted)
 
+    # 走访强度提示：仅统计应出勤（非休假）且当日已提交日志的客户经理
+    #   1-2段 = 走访强度偏弱，建议加强；3段 = 基本达标，不批评；4段及以上不点名
+    submitted_active = [p for p in submitted if not p["on_leave"]]
+    visit_weak = [p for p in submitted_active if p["segs"] <= 2]
+    visit_basic = [p for p in submitted_active if p["segs"] == 3]
+
     return {
         "today": today, "people": people, "total": total,
         "expected": expected, "submitted": submitted, "submit_rate": submit_rate,
         "on_leave": on_leave_names, "champion": champion, "six_juan": six_juan,
         "five_group": five_group, "branches": branches, "signs": signs,
         "chances": chances, "tomorrow": tomorrow, "products": products,
-        "total_segs": total_segs,
+        "total_segs": total_segs, "visit_weak": visit_weak, "visit_basic": visit_basic,
     }
 
 
@@ -424,6 +430,12 @@ th { background:#f7f9fc; font-weight:700; }
 .num { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:50%; background:#e74c3c; color:#fff; font-size:11px; font-weight:700; margin-right:8px; flex:0 0 auto; }
 .note { font-size:12px; color:#999; margin-top:6px; }
 .notes li { font-size:13px; color:#555; margin:3px 0; }
+.visit-block { margin-top:10px; border:1px solid #eef1f5; border-radius:10px; padding:10px 14px; }
+.visit-sub { font-size:13px; font-weight:700; margin-bottom:6px; }
+.visit-sub.weak { color:#c0392b; }
+.visit-sub.ok { color:#27ae60; }
+.vnum { display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; border-radius:50%; background:#e74c3c; color:#fff; font-size:11px; font-weight:700; margin-right:8px; flex:0 0 auto; }
+.vnum.ok { background:#27ae60; }
 """
 
 
@@ -456,19 +468,19 @@ def generate_html(stats, today_label):
         header = (f'<div class="branch-h" style="background:linear-gradient(135deg,{color},{dark});color:{txt};">'
                   f'{emoji} {esc(name)}（{b["expected"]}人应出勤·{len(b["submitted"])}人提交·{rate}）</div>')
         rows = ""
-        for m in sorted(b["members"], key=lambda x: (x["status"] != "提交", -x["segs"])):
+        for m in sorted([x for x in b["members"] if not x["on_leave"]],
+                        key=lambda x: (x["status"] != "提交", -x["segs"])):
             if m["status"] == "提交":
                 summ = " → ".join(m["summ"]) if m["summ"] else "（无明细）"
                 segs_cell = f'<span class="badge">{m["segs"]}段</span>'
-            elif m["status"] == "休假":
-                summ = "休假"
-                segs_cell = '<span class="badge" style="background:#95a5a6;">休假</span>'
             else:
                 summ = "未提交"
                 segs_cell = '<span class="badge" style="background:#e74c3c;">未提交</span>'
             rows += (f'<tr><td style="width:90px;font-weight:600;">{esc(m["name"])}</td>'
                      f'<td style="width:64px;">{segs_cell}</td>'
                      f'<td>{esc(summ)}</td></tr>')
+        if not rows:
+            rows = '<tr><td colspan="3" style="color:#999;">（当日该分局无应出勤人员）</td></tr>'
         table = (f'<table><thead><tr><th>成员</th><th>段数</th><th>工作摘要</th></tr></thead>'
                  f'<tbody>{rows}</tbody></table>')
         # 分局亮点（数据派生）
@@ -547,6 +559,26 @@ def generate_html(stats, today_label):
     ]
     notes_html = '<ul class="notes">' + "".join(f"<li>{n}</li>" for n in notes) + "</ul>"
 
+    # 九、走访强度提示（固定模块：委婉点名工作量不饱和者，中性表述）
+    weak, basic = s["visit_weak"], s["visit_basic"]
+    if weak or basic:
+        weak_items = "".join(
+            f'<li><span class="vnum">!</span><div><b>{esc(p["name"])}</b>（{p["segs"]}段）：'
+            f'走访密度偏低，建议在系统中分时段记录、细化记录颗粒度，并加大摸排走访频次。</div></li>'
+            for p in weak)
+        basic_items = "".join(
+            f'<li><span class="vnum ok">✓</span><div>{esc(p["name"])}（{p["segs"]}段）：基本达标，维持现有走访节奏即可。</div></li>'
+            for p in basic)
+        visit_html = (
+            f'<p class="note">说明：本模块仅统计应出勤（备注不含“休假”）且当日已提交日志的客户经理；'
+            f'休假人员免统计、未提交人员在分局分析中已单列，此处不重复通报。</p>'
+            f'<div class="visit-block"><div class="visit-sub weak">走访强度偏弱（1–2段，建议加强）</div>'
+            f'<ul class="tm">{weak_items}</ul></div>'
+            f'<div class="visit-block"><div class="visit-sub ok">基本达标（3段）</div>'
+            f'<ul class="tm">{basic_items}</ul></div>')
+    else:
+        visit_html = '<p class="note">当日提交人员走访强度整体良好，无偏弱情况，不点名。</p>'
+
     html = f"""<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8">
 <title>客户经理日志分析报告 {esc(today_label)}</title><style>{CSS}</style></head>
 <body>
@@ -561,6 +593,7 @@ def generate_html(stats, today_label):
 <div class="section"><h2>六、明日关注</h2>{tm_html}</div>
 <div class="section"><h2>七、分局活跃度排行</h2>{rank_html}</div>
 <div class="section"><h2>八、数据说明</h2>{notes_html}</div>
+<div class="section"><h2>九、走访强度提示</h2>{visit_html}</div>
 </body></html>"""
     return html
 

@@ -1,11 +1,8 @@
 name: 客户经理日志每日导出
 
 on:
-  schedule:
-    # 北京时间 = UTC+8：白天测试点 10:30/13:30 + 正式 21:30
-    - cron: "30 2 * * 1-5"
-    - cron: "30 5 * * 1-5"
-    - cron: "30 13 * * 1-5"
+  # 注意：GitHub 自带 schedule 定时器在本仓库始终不触发（实测 23 次运行 0 次 schedule），
+  # 故改用外部定时器（cron-job.org 等）定时调用 workflow_dispatch 接口来驱动，见说明。
   workflow_dispatch:
 
 jobs:

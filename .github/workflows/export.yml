@@ -31,3 +31,5 @@ jobs:
           FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
           FEISHU_USER_OPEN_ID: ${{ secrets.FEISHU_USER_OPEN_ID }}
         run: python export_excel.py
+
+# 调度重新注册 2026-07-29（强制 GitHub 重新加载 schedule 触发器）

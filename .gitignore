@@ -1,3 +1,6 @@
 __pycache__/
 *.pyc
 gh_logs.zip
+
+# 运行产物(导出/未填明细 xlsx，不入库)
+客户经理日志_*.xlsx

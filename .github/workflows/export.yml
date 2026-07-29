@@ -1,0 +1,39 @@
+name: 客户经理日志每日导出
+
+on:
+  schedule:
+    # 北京时间 = UTC+8
+    # —— 正式时段：21:30 BJT = 13:30 UTC ——
+    - cron: "30 13 * * 1-5"
+    # —— 白天测试时段（临时，验证定时器后删除）——
+    - cron: "30 2 * * 1-5"   # 10:30 BJT 测试
+    - cron: "30 5 * * 1-5"   # 13:30 BJT 测试
+  workflow_dispatch: {}   # 允许在 GitHub 网页手动触发测试
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 配置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 安装依赖
+        run: pip install -r requirements.txt
+
+      - name: 导出当日日志Excel并发送飞书
+        env:
+          FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
+          FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
+          FEISHU_USER_OPEN_ID: ${{ secrets.FEISHU_USER_OPEN_ID }}
+        run: python export_excel.py
+
+# 调度重新注册 2026-07-29（强制 GitHub 重新加载 schedule 触发器）

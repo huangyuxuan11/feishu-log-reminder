@@ -1,0 +1,36 @@
+name: 客户经理日志每日报告
+
+on:
+  workflow_dispatch:
+    inputs:
+      report_date:
+        description: "报告日期(YYYY-MM-DD)，留空=今天"
+        required: false
+        default: ""
+  # GitHub 自带定时器（北京时间=UTC+8）：22:00（晚于 20:45 末次提醒，给晚填者留时间）
+  # 与飞书多维表格自动化（同一档位 22:00）双保险；两路通过飞书去重控制表互斥，不会重复生成。
+  schedule:
+    - cron: "0 14 * * 1-5"
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: 安装依赖
+        run: pip install -r requirements.txt
+      - name: 安装无头浏览器(Chromium)与中文字体
+        run: |
+          playwright install --with-deps chromium
+          sudo apt-get update -y && sudo apt-get install -y fonts-noto-cjk
+      - name: 生成每日报告
+        env:
+          FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
+          FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
+          FEISHU_USER_OPEN_ID: ${{ secrets.FEISHU_USER_OPEN_ID }}
+          FEISHU_USER_ID: ${{ secrets.FEISHU_USER_ID }}
+          REPORT_DATE: ${{ github.event.inputs.report_date }}
+        run: python generate_report.py

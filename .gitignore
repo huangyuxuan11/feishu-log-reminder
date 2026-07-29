@@ -4,3 +4,8 @@ gh_logs.zip
 
 # 运行产物(导出/未填明细 xlsx，不入库)
 客户经理日志_*.xlsx
+
+# 报告生成产物(HTML/PDF，不入库)
+客户经理日志报告_*.html
+客户经理日志报告_*.pdf
+report_selftest.*

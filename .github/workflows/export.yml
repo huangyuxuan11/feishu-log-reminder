@@ -1,0 +1,27 @@
+name: 客户经理日志每日导出
+
+on:
+  schedule:
+    # 北京时间 = UTC+8：白天测试点 10:30/13:30 + 正式 21:30
+    - cron: "30 2 * * 1-5"
+    - cron: "30 5 * * 1-5"
+    - cron: "30 13 * * 1-5"
+  workflow_dispatch:
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: 安装依赖
+        run: pip install -r requirements.txt
+      - name: 运行每日导出
+        env:
+          FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
+          FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
+          FEISHU_USER_OPEN_ID: ${{ secrets.FEISHU_USER_OPEN_ID }}
+          FEISHU_USER_ID: ${{ secrets.FEISHU_USER_ID }}
+        run: python export_excel.py

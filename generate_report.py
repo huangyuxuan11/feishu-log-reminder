@@ -250,8 +250,8 @@ def person_segments(fields):
     return cnt
 
 
-def person_summaries(fields, max_items=5, trunc=18):
-    """工作摘要：取每条工作内容，剥噪声，截断，最多前5条，超出显示「等N项」。"""
+def person_summaries(fields):
+    """工作摘要：取每条工作内容，剥除纯时间段/纯会议占位噪声，完整展示不截断。"""
     n = max_seg_index(fields)
     items = []
     for i in range(1, n + 1):
@@ -262,10 +262,7 @@ def person_summaries(fields, max_items=5, trunc=18):
             continue
         if c in _PURE_MEETING:              # 纯会议占位词
             continue
-        c = c[:trunc] + ("…" if len(c) > trunc else "")
         items.append(c)
-    if len(items) > max_items:
-        return items[:max_items] + [f"等{len(items) - max_items}项"]
     return items
 
 
@@ -421,6 +418,8 @@ table { width:100%; border-collapse:collapse; font-size:13px; margin-top:6px; }
 th,td { border:1px solid #eee; padding:6px 8px; text-align:left; vertical-align:top; }
 th { background:#f7f9fc; font-weight:700; }
 .badge { display:inline-block; background:#3498db; color:#fff; border-radius:12px; padding:2px 10px; font-size:12px; font-weight:700; }
+.badge.vac { background:#95a5a6; }
+.badge.miss { background:#e74c3c; }
 .hl { margin:8px 4px 4px; padding:8px 14px; background:#fffbf0; border-left:4px solid #f1c40f; border-radius:0 6px 6px 0; font-size:12px; color:#666; }
 .sign-tbl thead th { background:#eafaf1!important; color:#27ae60!important; }
 .prod-tbl thead th { background:#ebf5fb!important; color:#2980b9!important; }
@@ -447,6 +446,7 @@ def generate_html(stats, today_label):
     five_txt = "、".join(s["five_group"]) or "无"
 
     # 全景概览卡片
+    leave_txt = "、".join(s['on_leave']) or "无"
     ov_cards = [
         ("团队总数", f"{s['total']}人（6分局+行业组）"),
         ("应出勤 / 实际提交", f"{s['expected']} / {len(s['submitted'])}（{s['submit_rate']:.0f}%）"),
@@ -454,6 +454,7 @@ def generate_html(stats, today_label):
         ("拜访冠军🥇", champ_txt),
         ("6段卷王", six_txt),
         ("5段高效组", five_txt),
+        ("休假缺勤", f"{len(s['on_leave'])}人：{leave_txt}"),
     ]
     ov_html = '<div class="ov">' + "".join(
         f'<div class="card"><div class="ck">{esc(k)}</div><div class="cv">{esc(v)}</div></div>'
@@ -468,14 +469,17 @@ def generate_html(stats, today_label):
         header = (f'<div class="branch-h" style="background:linear-gradient(135deg,{color},{dark});color:{txt};">'
                   f'{emoji} {esc(name)}（{b["expected"]}人应出勤·{len(b["submitted"])}人提交·{rate}）</div>')
         rows = ""
-        for m in sorted([x for x in b["members"] if not x["on_leave"]],
-                        key=lambda x: (x["status"] != "提交", -x["segs"])):
-            if m["status"] == "提交":
+        for m in sorted(b["members"],
+                        key=lambda x: (x["on_leave"], x["status"] != "提交", -x["segs"])):
+            if m["on_leave"]:
+                summ = "—"
+                segs_cell = '<span class="badge vac">休假</span>'
+            elif m["status"] == "提交":
                 summ = " → ".join(m["summ"]) if m["summ"] else "（无明细）"
                 segs_cell = f'<span class="badge">{m["segs"]}段</span>'
             else:
                 summ = "未提交"
-                segs_cell = '<span class="badge" style="background:#e74c3c;">未提交</span>'
+                segs_cell = '<span class="badge miss">未提交</span>'
             rows += (f'<tr><td style="width:90px;font-weight:600;">{esc(m["name"])}</td>'
                      f'<td style="width:64px;">{segs_cell}</td>'
                      f'<td>{esc(summ)}</td></tr>')
@@ -586,14 +590,14 @@ def generate_html(stats, today_label):
 <div class="sub">数据来源：客户经理日志统计（飞书多维表格）</div>
 
 <div class="section"><h2>一、全景概览</h2>{ov_html}</div>
-<div class="section"><h2>二、分局深度分析</h2>{branch_html}</div>
-<div class="section"><h2>三、签约落地 ✅</h2>{sign_html}</div>
-<div class="section"><h2>四、关键商机追踪 🔥</h2>{ch_html}</div>
-<div class="section"><h2>五、产品维度分析</h2>{prod_html}</div>
-<div class="section"><h2>六、明日关注</h2>{tm_html}</div>
-<div class="section"><h2>七、分局活跃度排行</h2>{rank_html}</div>
-<div class="section"><h2>八、数据说明</h2>{notes_html}</div>
-<div class="section"><h2>九、走访强度提示</h2>{visit_html}</div>
+<div class="section"><h2>二、走访强度提示</h2>{visit_html}</div>
+<div class="section"><h2>三、明日关注</h2>{tm_html}</div>
+<div class="section"><h2>四、分局深度分析</h2>{branch_html}</div>
+<div class="section"><h2>五、签约落地 ✅</h2>{sign_html}</div>
+<div class="section"><h2>六、关键商机追踪 🔥</h2>{ch_html}</div>
+<div class="section"><h2>七、产品维度分析</h2>{prod_html}</div>
+<div class="section"><h2>八、分局活跃度排行</h2>{rank_html}</div>
+<div class="section"><h2>九、数据说明</h2>{notes_html}</div>
 </body></html>"""
     return html
 
@@ -603,7 +607,7 @@ def html_to_pdf(html_path, pdf_path):
     from playwright.sync_api import sync_playwright
     with sync_playwright() as p:
         browser = p.chromium.launch(args=["--no-sandbox", "--disable-gpu"])
-        page = p.chromium.new_page()
+        page = browser.new_page()
         page.goto("file://" + html_path)
         page.pdf(path=pdf_path, format="A4", print_background=True,
                  margin={"top": "12mm", "bottom": "12mm", "left": "10mm", "right": "10mm"})

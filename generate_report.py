@@ -608,7 +608,9 @@ def html_to_pdf(html_path, pdf_path):
     with sync_playwright() as p:
         browser = p.chromium.launch(args=["--no-sandbox", "--disable-gpu"])
         page = browser.new_page()
-        page.goto("file://" + html_path)
+        # 必须用绝对路径（file:// + 绝对路径 = file:///home/...），相对路径会被当成主机名导致 ERR_INVALID_URL
+        abs_html = os.path.abspath(html_path)
+        page.goto("file://" + abs_html)
         page.pdf(path=pdf_path, format="A4", print_background=True,
                  margin={"top": "12mm", "bottom": "12mm", "left": "10mm", "right": "10mm"})
         browser.close()

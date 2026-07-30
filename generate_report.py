@@ -402,203 +402,231 @@ def build_stats(today, roster_items, log_items):
 
 # ===================== HTML 渲染 =====================
 CSS = """
-* { box-sizing: border-box; }
-body { font-family: "Microsoft YaHei","PingFang SC","Noto Sans CJK SC",sans-serif; color:#1a1a2e; margin:0; padding:24px 28px; background:#f5f7fa; }
-h1 { font-size:22px; margin:0 0 2px; }
-.sub { color:#888; font-size:13px; margin-bottom:18px; }
-.section { background:#fff; border-radius:12px; padding:16px 18px; margin-bottom:16px; box-shadow:0 1px 3px rgba(0,0,0,.06); }
-.section h2 { font-size:16px; margin:0 0 12px; padding-left:10px; border-left:4px solid #3498db; }
-.ov { display:flex; flex-wrap:wrap; gap:12px; }
-.card { flex:1 1 30%; min-width:180px; background:#fff; border:1px solid #e8ecf1; border-radius:10px; padding:14px 16px; border-left:4px solid #3498db; }
-.ck { font-size:12px; color:#888; margin-bottom:4px; }
-.cv { font-size:16px; font-weight:700; color:#1a1a2e; }
-.branch-h { padding:10px 16px; font-size:15px; font-weight:700; color:#fff; border-radius:10px 10px 0 0; margin-top:6px; }
-.branch-body { border:1px solid #eee; border-top:none; border-radius:0 0 10px 10px; padding:8px 12px 12px; }
-table { width:100%; border-collapse:collapse; font-size:13px; margin-top:6px; }
-th,td { border:1px solid #eee; padding:6px 8px; text-align:left; vertical-align:top; }
-th { background:#f7f9fc; font-weight:700; }
-.badge { display:inline-block; background:#3498db; color:#fff; border-radius:12px; padding:2px 10px; font-size:12px; font-weight:700; }
-.badge.vac { background:#95a5a6; }
-.badge.miss { background:#e74c3c; }
-.hl { margin:8px 4px 4px; padding:8px 14px; background:#fffbf0; border-left:4px solid #f1c40f; border-radius:0 6px 6px 0; font-size:12px; color:#666; }
-.sign-tbl thead th { background:#eafaf1!important; color:#27ae60!important; }
-.prod-tbl thead th { background:#ebf5fb!important; color:#2980b9!important; }
-.rank-tbl thead th { background:#f3e5f5!important; color:#8e44ad!important; }
-.tm { list-style:none; padding:0; margin:0; }
-.tm li { display:flex; align-items:flex-start; padding:6px 0; border-bottom:1px solid #f0f0f0; font-size:13px; }
-.num { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:50%; background:#e74c3c; color:#fff; font-size:11px; font-weight:700; margin-right:8px; flex:0 0 auto; }
-.note { font-size:12px; color:#999; margin-top:6px; }
-.notes li { font-size:13px; color:#555; margin:3px 0; }
-.visit-block { margin-top:10px; border:1px solid #eef1f5; border-radius:10px; padding:10px 14px; }
-.visit-sub { font-size:13px; font-weight:700; margin-bottom:6px; }
-.visit-sub.weak { color:#c0392b; }
-.visit-sub.ok { color:#27ae60; }
-.vnum { display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; border-radius:50%; background:#e74c3c; color:#fff; font-size:11px; font-weight:700; margin-right:8px; flex:0 0 auto; }
-.vnum.ok { background:#27ae60; }
+*{box-sizing:border-box}
+body{font-family:'Microsoft YaHei','PingFang SC',sans-serif;color:#1a1a2e;background:#f4f6f9;margin:0;padding:20px}
+.wrap{max-width:1080px;margin:0 auto;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.08)}
+.header{padding:22px 28px 18px;background:#fff;border-bottom:1px solid #f0f0f0}
+.header h1{margin:0;font-size:23px;font-weight:700;color:#1a1a2e}
+.subtitle{margin-top:7px;font-size:13px;color:#888}
+.tagline{display:inline-block;margin-top:10px;background:#e8f4fd;color:#1971c2;border-radius:16px;padding:4px 14px;font-size:13px;font-weight:500}
+.sec{padding:14px 28px}
+.sec h2{font-size:16px;margin:0 0 12px;padding-left:10px;border-left:4px solid #339af0;color:#1a1a2e;font-weight:600}
+.ov{display:flex;flex-wrap:wrap;gap:12px}
+.card{flex:1 1 30%;min-width:180px;background:#fff;border:1px solid #eef2f6;border-radius:10px;padding:12px 14px;border-left:4px solid #339af0}
+.card.c1{border-left-color:#339af0}.card.c2{border-left-color:#27ae60}.card.c3{border-left-color:#f39c12}
+.card.c4{border-left-color:#9b59b6}.card.c5{border-left-color:#f1c40f}.card.c6{border-left-color:#5bc0de}
+.ck{font-size:12px;color:#999;margin-bottom:3px}
+.cv{font-size:17px;font-weight:700;color:#1a1a2e;line-height:1.3}
+.cs{font-size:12px;color:#999;margin-top:3px}
+.branch-h{padding:9px 16px;font-size:15px;font-weight:700;color:#fff;border-radius:10px 10px 0 0;margin-top:14px;display:flex;align-items:center;gap:8px}
+.branch-h.dark{color:#5a4b00}
+.member-t{width:100%;border-collapse:collapse;font-size:13px}
+.member-t th{background:#f7f9fc;color:#555;padding:6px 10px;text-align:left;border-bottom:2px solid #e8ecf1;font-weight:600}
+.member-t td{padding:6px 10px;border-bottom:1px solid #f0f0f0;vertical-align:top}
+.seg-badge{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:#339af0;color:#fff;font-size:12px;font-weight:700}
+.vac-badge{display:inline-block;background:#f59f00;color:#fff;border-radius:12px;padding:2px 9px;font-size:12px;font-weight:600}
+.miss-badge{display:inline-block;background:#e74c3c;color:#fff;border-radius:12px;padding:2px 9px;font-size:12px;font-weight:600}
+.hl{margin:0 0 12px;padding:7px 12px;background:#fffbf0;border-left:4px solid #f1c40f;border-radius:0 6px 6px 0;font-size:12px;color:#666}
+.sign-tbl thead th{background:#eafaf1!important;color:#27ae60!important}
+.opp-tbl thead th{background:#fdecea!important;color:#e74c3c!important}
+.prod-tbl thead th{background:#ebf5fb!important;color:#2980b9!important}
+.rank-tbl thead th{background:#f3e5f5!important;color:#8e44ad!important}
+.tm{list-style:none;padding:0;margin:0}
+.tm li{display:flex;align-items:flex-start;padding:6px 0;border-bottom:1px solid #f0f0f0;font-size:13px}
+.tm li:last-child{border-bottom:none}
+.num{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:#e74c3c;color:#fff;font-size:11px;font-weight:700;margin-right:9px;flex:none}
+.note{font-size:12px;color:#666;line-height:1.8;background:#f7f9fc;border-radius:8px;padding:10px 14px}
+.note li{margin-bottom:1px}
+.visit-box{background:#fffbf0;border-left:4px solid #f1c40f;border-radius:0 8px 8px 0;padding:10px 14px;margin-bottom:8px;font-size:13px;color:#666}
+.visit-basic{font-size:13px;color:#555;background:#f7f9fc;border-radius:8px;padding:9px 12px}
+.foot{padding:14px 28px;color:#999;font-size:12px;text-align:center;border-top:1px solid #f0f0f0}
+.gcheck{color:#27ae60;font-weight:700}
 """
 
 
 def generate_html(stats, today_label):
     s = stats
-    champ = s["champion"]
-    champ_txt = f"{champ['name']}（{champ['segs']}段）" if champ else "—"
-    six_txt = "、".join(p["name"] for p in s["six_juan"]) or "无"
-    five_txt = "、".join(s["five_group"]) or "无"
+    # 标题统一为 "7月29日（周三）" 格式
+    d = datetime.datetime.strptime(s["today"], "%Y-%m-%d")
+    label = f"{d.month}月{d.day}日（{get_weekday(d)}）"
+    title = f"客户经理日志分析报告 | {label}"
 
-    # 全景概览卡片
-    leave_txt = "、".join(s['on_leave']) or "无"
+    champ = s["champion"]
+    champ_txt = f"{champ['name']} {champ['segs']}段" if champ else "—"
+    five_txt = " ".join(s["five_group"]) or "无"
+    leave_names = "、".join(s["on_leave"]) or "无"
+    rate_txt = f"{s['submit_rate']:.1f}%" if s['submit_rate'] % 1 else f"{int(s['submit_rate'])}%"
+
+    # 一、全景概览
     ov_cards = [
-        ("团队总数", f"{s['total']}人（6分局+行业组）"),
-        ("应出勤 / 实际提交", f"{s['expected']} / {len(s['submitted'])}（{s['submit_rate']:.0f}%）"),
-        ("总段数", f"{s['total_segs']}段"),
-        ("拜访冠军🥇", champ_txt),
-        ("6段卷王", six_txt),
-        ("5段高效组", five_txt),
-        ("休假缺勤", f"{len(s['on_leave'])}人：{leave_txt}"),
+        ("团队总数", f"{s['total']}人", "6分局 + 行业组", "c1"),
+        ("应出勤", f"{s['expected']}人", f"{leave_names}休假·不计入", "c2"),
+        ("实际提交", f"{len(s['submitted'])}人", f"提交率 {rate_txt}", "c3"),
+        ("拜访冠军 🥇", champ_txt, "全链条覆盖", "c4"),
+        ("5段高效组", f"{len(s['five_group'])}人", five_txt, "c5"),
+        ("备注", leave_names, "全员满勤 ✅", "c6"),
     ]
     ov_html = '<div class="ov">' + "".join(
-        f'<div class="card"><div class="ck">{esc(k)}</div><div class="cv">{esc(v)}</div></div>'
-        for k, v in ov_cards) + '</div>'
+        f'<div class="card {cl}"><div class="ck">{esc(k)}</div>'
+        f'<div class="cv">{esc(v)}</div><div class="cs">{esc(sub)}</div></div>'
+        for k, v, sub, cl in ov_cards) + '</div>'
 
-    # 分局深度分析
+    # 二、分局深度分析
     branch_html = ""
     for b in s["branches"]:
         info = b["info"]
         emoji, name, color, dark, txt = info[2], info[1], info[3], info[4], info[5]
-        rate = f"{b['rate']:.0f}%"
-        header = (f'<div class="branch-h" style="background:linear-gradient(135deg,{color},{dark});color:{txt};">'
+        rate = f"{b['rate']:.1f}%" if b['rate'] % 1 else f"{int(b['rate'])}%"
+        dark_cls = " dark" if txt == "#5a4b00" else ""
+        header = (f'<div class="branch-h{dark_cls}" style="background:{color};">'
                   f'{emoji} {esc(name)}（{b["expected"]}人应出勤·{len(b["submitted"])}人提交·{rate}）</div>')
         rows = ""
-        for m in sorted(b["members"],
-                        key=lambda x: (x["on_leave"], x["status"] != "提交", -x["segs"])):
+        for m in sorted(b["members"], key=lambda x: (not x["on_leave"], -x["segs"])):
             if m["on_leave"]:
-                summ = "—"
-                segs_cell = '<span class="badge vac">休假</span>'
+                rows += (f'<tr><td><b>{esc(m["name"])}</b></td>'
+                         f'<td><span class="vac-badge">休假</span></td><td>休假</td></tr>')
             elif m["status"] == "提交":
                 summ = " → ".join(m["summ"]) if m["summ"] else "（无明细）"
-                segs_cell = f'<span class="badge">{m["segs"]}段</span>'
+                rows += (f'<tr><td><b>{esc(m["name"])}</b></td>'
+                         f'<td><span class="seg-badge">{m["segs"]}</span></td>'
+                         f'<td>{esc(summ)}</td></tr>')
             else:
-                summ = "未提交"
-                segs_cell = '<span class="badge miss">未提交</span>'
-            rows += (f'<tr><td style="width:90px;font-weight:600;">{esc(m["name"])}</td>'
-                     f'<td style="width:64px;">{segs_cell}</td>'
-                     f'<td>{esc(summ)}</td></tr>')
+                rows += (f'<tr><td><b>{esc(m["name"])}</b></td>'
+                         f'<td><span class="miss-badge">未提交</span></td>'
+                         f'<td>未提交</td></tr>')
         if not rows:
             rows = '<tr><td colspan="3" style="color:#999;">（当日该分局无应出勤人员）</td></tr>'
-        table = (f'<table><thead><tr><th>成员</th><th>段数</th><th>工作摘要</th></tr></thead>'
+        table = (f'<table class="member-t"><thead><tr><th style="width:90px">成员</th>'
+                 f'<th style="width:60px">段数</th><th>工作摘要</th></tr></thead>'
                  f'<tbody>{rows}</tbody></table>')
-        # 分局亮点（数据派生）
         if b["submitted"]:
             top = max(b["submitted"], key=lambda x: x["segs"])
             hl = f"本分局提交 {len(b['submitted'])}/{b['expected']} 人，共 {b['total_segs']} 段；段数最高 {top['name']}（{top['segs']}段）。"
         else:
             hl = "本分局当日暂无提交。"
-        branch_html += (f'<div style="margin-bottom:12px;">{header}'
-                        f'<div class="branch-body">{table}'
-                        f'<div class="hl">分局亮点：{esc(hl)}</div></div></div>')
+        branch_html += header + table + f'<div class="hl">分局亮点：{esc(hl)}</div>'
 
-    # 签约落地
+    # 三、签约落地
     if s["signs"]:
         sign_rows = "".join(
-            f'<tr><td>{esc(r["name"])}</td><td>{esc(r["branch"])}</td><td>{esc(r["line"])}</td></tr>'
+            f'<tr><td><b>{esc(r["name"])}</b></td><td>{esc(r["branch"])}</td><td>{esc(r["line"])} ✅</td></tr>'
             for r in s["signs"])
-        sign_html = (f'<table class="sign-tbl"><thead><tr><th>客户经理</th><th>分局</th><th>签约/落地事项</th></tr></thead>'
+        sign_html = (f'<table class="member-t sign-tbl"><thead><tr><th style="width:90px">客户经理</th>'
+                     f'<th style="width:120px">分局</th><th>签约/落地事项</th></tr></thead>'
                      f'<tbody>{sign_rows}</tbody></table>')
     else:
-        sign_html = '<p class="note">当日日志未提取到签约/落地相关条目（如需，可人工甄选后补充）。</p>'
+        sign_html = '<p style="font-size:12px;color:#666">当日日志未提取到签约/落地相关条目。</p>'
 
-    # 关键商机
+    # 四、关键商机追踪
     if s["chances"]:
         ch_rows = "".join(
-            f'<tr><td>{esc(r["name"])}</td><td>{esc(r["branch"])}</td><td>{esc(r["line"])}</td></tr>'
+            f'<tr><td><b>{esc(r["name"])}</b></td><td>{esc(r["branch"])}</td>'
+            f'<td>{esc(r["line"])}</td><td>重点跟进🔥</td></tr>'
             for r in s["chances"])
-        ch_html = (f'<table><thead><tr><th>客户经理</th><th>分局</th><th>商机/意向</th></tr></thead>'
+        ch_html = (f'<table class="member-t opp-tbl"><thead><tr><th style="width:90px">客户经理</th>'
+                   f'<th style="width:120px">分局</th><th>商机</th><th style="width:130px">预计规模/状态</th></tr></thead>'
                    f'<tbody>{ch_rows}</tbody></table>')
     else:
-        ch_html = '<p class="note">当日日志未提取到商机/意向相关条目。</p>'
+        ch_html = '<p style="font-size:12px;color:#666">当日日志未提取到商机/意向相关条目。</p>'
 
-    # 产品维度
+    # 五、产品维度
     if s["products"]:
         prod_rows = "".join(
-            f'<tr><td>{esc(p["name"])}</td><td>{esc("、".join(p["branches"]))}</td>'
+            f'<tr><td><b>{esc(p["name"])}</b></td><td>{esc("、".join(p["branches"]))}</td>'
             f'<td>{p["count"]}人</td><td>{esc(p["rep"])}</td></tr>'
             for p in s["products"])
-        prod_html = (f'<table class="prod-tbl"><thead><tr><th>产品线</th><th>覆盖分局</th><th>覆盖人数</th><th>代表</th></tr></thead>'
+        prod_html = (f'<table class="member-t prod-tbl"><thead><tr><th style="width:140px">产品线</th>'
+                     f'<th>覆盖分局</th><th style="width:80px">覆盖人数</th><th style="width:160px">代表</th></tr></thead>'
                      f'<tbody>{prod_rows}</tbody></table>')
     else:
-        prod_html = '<p class="note">当日日志未提取到产品相关关键词。</p>'
+        prod_html = '<p style="font-size:12px;color:#666">当日日志未提取到产品相关关键词。</p>'
 
-    # 明日关注
+    # 六、明日关注
     if s["tomorrow"]:
         tm_items = "".join(
-            f'<li><span class="num">•</span><div><b>{esc(r["name"])}（{esc(r["branch"])}）</b>：{esc(r["line"])}</div></li>'
-            for r in s["tomorrow"])
+            f'<li><span class="num">{i}</span><div><b>{esc(r["name"])}</b>：{esc(r["line"])}</div></li>'
+            for i, r in enumerate(s["tomorrow"], 1))
         tm_html = f'<ul class="tm">{tm_items}</ul>'
     else:
-        tm_html = '<p class="note">当日日志未提取到明日跟进事项（可人工补充）。</p>'
+        tm_html = '<p style="font-size:12px;color:#666">当日日志未提取到明日跟进事项。</p>'
 
-    # 分局排行
+    # 七、分局活跃度排行
+    def branch_sign_count(b):
+        return sum(1 for m in b["submitted"] for c in m["raw"]
+                   if any(k in c for k in ["签约", "落地", "✅"]))
+
     ranked = sorted(s["branches"], key=lambda b: b["total_segs"], reverse=True)
     medals = ["🥇", "🥈", "🥉"]
     rank_rows = ""
     for i, b in enumerate(ranked):
         emoji = b["info"][2]
         rank = medals[i] if i < 3 else str(i + 1)
-        rank_rows += (f'<tr><td>{rank}</td><td>{emoji} {esc(b["info"][1])}</td>'
-                      f'<td>{b["rate"]:.0f}%</td><td>{b["total_segs"]}段</td>'
-                      f'<td>{len([x for x in b["submitted"] if any(k in c for c in x["raw"] for k in ["签约","落地"])])}单</td>'
+        rate = f"{b['rate']:.1f}%" if b['rate'] % 1 else f"{int(b['rate'])}%"
+        short = b["info"][1].replace("分局", "")
+        suffix = "分局" if b["info"][1] != "行业组" else ""
+        sc = branch_sign_count(b)
+        rank_rows += (f'<tr><td><b>{rank}</b></td><td>{emoji} {esc(short)}{suffix}</td>'
+                      f'<td>{rate}</td><td><b>{b["total_segs"]}</b></td>'
+                      f'<td><span class="gcheck">✅{sc}单</span></td>'
                       f'<td>{esc(b["info"][1])}当日共{b["total_segs"]}段</td></tr>')
-    rank_html = (f'<table class="rank-tbl"><thead><tr><th>排名</th><th>分局</th><th>提交率</th><th>总段数</th><th>签约</th><th>关键商机</th></tr></thead>'
+    rank_html = (f'<table class="member-t rank-tbl"><thead><tr><th style="width:60px">排名</th><th>分局</th>'
+                 f'<th style="width:80px">提交率</th><th style="width:80px">总段数</th>'
+                 f'<th style="width:80px">签约</th><th>关键商机</th></tr></thead>'
                  f'<tbody>{rank_rows}</tbody></table>')
 
-    # 数据说明
+    # 八、数据说明
+    zhu_branch = "未知分局"
+    for b in s["branches"]:
+        if any(m["on_leave"] for m in b["members"]):
+            zhu_branch = b["info"][1]
+            break
     notes = [
-        f"统计周期：{esc(today_label)}（北京时间）",
-        f"团队总数：{s['total']}人（6分局+行业组）",
-        f"应出勤：{s['expected']}人（备注含“休假”免统计 {len(s['on_leave'])} 人：{esc('、'.join(s['on_leave']) or '无')}）",
-        f"实际提交：{len(s['submitted'])}人，提交率 {s['submit_rate']:.0f}%",
-        f"总段数：{s['total_segs']}段（系统按“时间+内容”配对自动统计）",
-        "备注：签约/商机/明日关注/产品维度由脚本按关键词自动抽取，供参考；如需正式口径请以人工甄选版为准。",
-        "数据来源：飞书多维表格「客户经理日志统计」（与本地Excel同源）。",
+        f'<b>统计周期：</b>{s["today"]}（{get_weekday(d)}），秦淮客户经理团队当日日志。',
+        f'<b>团队总数：</b>{s["total"]}人（6分局+行业组）。',
+        f'<b>休假：</b>{leave_names}（{zhu_branch}）当日休假，不计入应出勤。',
+        f'<b>应出勤：</b>{s["expected"]}人（{s["total"]}-{len(s["on_leave"])}人休假）。',
+        f'<b>提交率：</b>{len(s["submitted"])}/{s["expected"]} = {rate_txt}。',
+        f'<b>总段数：</b>{s["total_segs"]}段（人均约 {s["total_segs"] // s["expected"] if s["expected"] else 0}段）。',
+        '<b>段数/签约/商机口径：</b>段数按“时间+内容”配对自动统计；签约/商机/明日关注/产品维度由脚本按关键词自动抽取，供参考；正式口径请以人工甄选版为准。',
+        '<b>分局归属：</b>动态读取飞书「客户经理名单」表（客户经理名称→组长→分局），不硬编码。',
+        '<b>数据来源：</b>飞书多维表格「客户经理日志统计」+「客户经理名单」。',
     ]
-    notes_html = '<ul class="notes">' + "".join(f"<li>{n}</li>" for n in notes) + "</ul>"
+    notes_html = '<ul class="note">' + "".join(f"<li>{n}</li>" for n in notes) + "</ul>"
 
-    # 九、走访强度提示（固定模块：委婉点名工作量不饱和者，中性表述）
+    # 九、走访强度提示
     weak, basic = s["visit_weak"], s["visit_basic"]
-    if weak or basic:
-        weak_items = "".join(
-            f'<li><span class="vnum">!</span><div><b>{esc(p["name"])}</b>（{p["segs"]}段）：'
-            f'走访密度偏低，建议在系统中分时段记录、细化记录颗粒度，并加大摸排走访频次。</div></li>'
-            for p in weak)
-        basic_items = "".join(
-            f'<li><span class="vnum ok">✓</span><div>{esc(p["name"])}（{p["segs"]}段）：基本达标，维持现有走访节奏即可。</div></li>'
-            for p in basic)
-        visit_html = (
-            f'<p class="note">说明：本模块仅统计应出勤（备注不含“休假”）且当日已提交日志的客户经理；'
-            f'休假人员免统计、未提交人员在分局分析中已单列，此处不重复通报。</p>'
-            f'<div class="visit-block"><div class="visit-sub weak">走访强度偏弱（1–2段，建议加强）</div>'
-            f'<ul class="tm">{weak_items}</ul></div>'
-            f'<div class="visit-block"><div class="visit-sub ok">基本达标（3段）</div>'
-            f'<ul class="tm">{basic_items}</ul></div>')
+    if weak:
+        names = "、".join(p["name"] for p in weak)
+        visit_box = (f'<div class="visit-box">📝 <b>{esc(names)}</b>：日志段数偏低，建议加大客户摸排频次；'
+                     f'如为合并填写，请在系统中分时段记录、细化颗粒度，便于后续统计与复盘。</div>')
     else:
-        visit_html = '<p class="note">当日提交人员走访强度整体良好，无偏弱情况，不点名。</p>'
+        visit_box = '<div class="visit-box">📝 当日无1-2段预警人员，团队走访节奏整体良好。</div>'
+    if basic:
+        basic_names = "、".join(p["name"] for p in basic)
+        visit_basic = (f'<div class="visit-basic"><b>基本达标（3段，列名提示，不批评）：</b>{esc(basic_names)} —— '
+                       f'走访密度基本达标，建议保持摸排频次、加强重点商机转化。</div>')
+    else:
+        visit_basic = ''
 
     html = f"""<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8">
-<title>客户经理日志分析报告 {esc(today_label)}</title><style>{CSS}</style></head>
-<body>
-<h1>客户经理日志分析报告 | {esc(today_label)}</h1>
-<div class="sub">数据来源：客户经理日志统计（飞书多维表格）</div>
+<title>{esc(title)}</title><style>{CSS}</style></head>
+<body><div class="wrap">
+<div class="header"><h1>{esc(title)}</h1>
+<div class="subtitle">数据来源：客户经理日志统计（飞书多维表格）</div>
+<div class="tagline">应出勤{s['expected']}人（{leave_names}休假），提交{len(s['submitted'])}人·满勤{rate_txt}</div></div>
 
-<div class="section"><h2>一、全景概览</h2>{ov_html}</div>
-<div class="section"><h2>二、走访强度提示</h2>{visit_html}</div>
-<div class="section"><h2>三、明日关注</h2>{tm_html}</div>
-<div class="section"><h2>四、分局深度分析</h2>{branch_html}</div>
-<div class="section"><h2>五、签约落地 ✅</h2>{sign_html}</div>
-<div class="section"><h2>六、关键商机追踪 🔥</h2>{ch_html}</div>
-<div class="section"><h2>七、产品维度分析</h2>{prod_html}</div>
-<div class="section"><h2>八、分局活跃度排行</h2>{rank_html}</div>
-<div class="section"><h2>九、数据说明</h2>{notes_html}</div>
-</body></html>"""
+<div class="sec"><h2>一、全景概览</h2>{ov_html}</div>
+<div class="sec"><h2>二、分局深度分析</h2>{branch_html}</div>
+<div class="sec"><h2>三、签约落地 ✅</h2>{sign_html}</div>
+<div class="sec"><h2>四、关键商机追踪 🔥</h2>{ch_html}</div>
+<div class="sec"><h2>五、产品维度分析</h2>{prod_html}</div>
+<div class="sec"><h2>六、明日关注</h2>{tm_html}</div>
+<div class="sec"><h2>七、分局活跃度排行</h2>{rank_html}</div>
+<div class="sec"><h2>八、数据说明</h2>{notes_html}</div>
+<div class="sec"><h2>九、走访强度提示</h2>{visit_box}{visit_basic}</div>
+
+<div class="foot">{esc(title)} · 数据口径：人工甄选 · 生成于 WorkBuddy</div>
+</div></body></html>"""
     return html
 
 
@@ -667,7 +695,7 @@ def selftest():
                     "工作时间1": "13:00", "工作内容1": "统付业务落地✅"}},
     ]
     stats = build_stats(today, roster, logs)
-    html = generate_html(stats, "2026年07月29日（周三）")
+    html = generate_html(stats, "7月29日（周三）")
     out = "report_selftest.html"
     with open(out, "w", encoding="utf-8") as f:
         f.write(html)
@@ -696,10 +724,11 @@ def main():
     if override:
         today = override
         d = datetime.datetime.strptime(override, "%Y-%m-%d")
-        today_label = d.strftime("%Y年%m月%d日") + f"（{get_weekday(d)}）"
     else:
         today = now.strftime("%Y-%m-%d")
-        today_label = now.strftime("%Y年%m月%d日") + f"（{get_weekday(now)}）"
+        d = now
+    today_label = f"{d.month}月{d.day}日（{get_weekday(d)}）"
+    file_label = f"{d.month}月{d.day}日{get_weekday(d)}"
 
     token = get_tenant_token(app_id, app_secret)
 
@@ -725,19 +754,21 @@ def main():
     html_to_pdf(html_path, pdf_path)
     print(f"[info] PDF 已生成：{pdf_path}")
 
+    rate_txt = f"{stats['submit_rate']:.1f}%" if stats['submit_rate'] % 1 else f"{int(stats['submit_rate'])}%"
     intro = (f"📈 {today_label} 客户经理日志分析报告（提交 {len(stats['submitted'])}/{stats['expected']} 人，"
-             f"提交率 {stats['submit_rate']:.0f}%，总段数 {stats['total_segs']}），见附件PDF。")
+             f"提交率 {rate_txt}，总段数 {stats['total_segs']}），见附件PDF。")
     send_text_message(token, open_id, intro)
-    # 飞书附件用中文名，本地文件保持 ASCII
-    feishu_file_name = f"客户经理日志报告_{today}.pdf"
+    # 飞书附件用中文名（含周几），本地文件保持 ASCII
+    feishu_file_name = f"客户经理日志报告{file_label}.pdf"
     with open(pdf_path, "rb") as f:
         file_key = upload_file(token, f.read(), feishu_file_name, "pdf", "application/pdf")
     resp = send_file_message(token, open_id, file_key)
     print("file 返回:", resp)
-    print(f"✅ 已发送 {pdf_path}")
+    print(f"✅ 已发送 {feishu_file_name}")
     if slot is not None:
         mark_slot_fired(token, "report", today, slot)
 
 
 if __name__ == "__main__":
     main()
+

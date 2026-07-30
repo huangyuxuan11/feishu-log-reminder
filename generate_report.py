@@ -713,8 +713,9 @@ def main():
     stats = build_stats(today, roster_items, log_items)
 
     html = generate_html(stats, today_label)
-    html_path = f"客户经理日志报告_{today}.html"
-    pdf_path = f"客户经理日志报告_{today}.pdf"
+    # 本地中间文件用 ASCII 名，避免 Chromium 对中文路径 URL 编码失败（net::ERR_INVALID_URL）
+    html_path = f"report_{today}.html"
+    pdf_path = f"report_{today}.pdf"
     with open(html_path, "w", encoding="utf-8") as f:
         f.write(html)
     print(f"[info] HTML 已生成：{html_path}")
@@ -725,8 +726,10 @@ def main():
     intro = (f"📈 {today_label} 客户经理日志分析报告（提交 {len(stats['submitted'])}/{stats['expected']} 人，"
              f"提交率 {stats['submit_rate']:.0f}%，总段数 {stats['total_segs']}），见附件PDF。")
     send_text_message(token, open_id, intro)
+    # 飞书附件用中文名，本地文件保持 ASCII
+    feishu_file_name = f"客户经理日志报告_{today}.pdf"
     with open(pdf_path, "rb") as f:
-        file_key = upload_file(token, f.read(), pdf_path, "pdf", "application/pdf")
+        file_key = upload_file(token, f.read(), feishu_file_name, "pdf", "application/pdf")
     resp = send_file_message(token, open_id, file_key)
     print("file 返回:", resp)
     print(f"✅ 已发送 {pdf_path}")

@@ -228,6 +228,68 @@ def extract_name(fields):
     return ""
 
 
+def _parse_leave_ranges(note):
+    """从名单表「备注」中解析休假日期区间，返回 [(start, end), ...] (datetime.date)。
+
+    支持写法（年份缺省取当前年）：
+      - '8月20日-8月24日休假'  /  '2026年8月20日-8月24日'
+      - '8月20日-24日'         （结束日省略月份，沿用起始月）
+      - '12月30日-1月5日'      （跨年，结束月小于起始月则结束年+1）
+      - 单日 '8月20日休假'      （区间即当天）
+    """
+    if not note:
+        return []
+    base_year = datetime.date.today().year
+    ym = re.search(r"(\d{4})\s*年", note)
+    if ym:
+        base_year = int(ym.group(1))
+    txt = note.replace("～", "~").replace("—", "~").replace("至", "~").replace("到", "~")
+    ranges = []
+    # 区间：M月D日 [分隔符] (M月)?D日
+    range_re = re.compile(
+        r"(\d{1,2})\s*月\s*(\d{1,2})\s*日\s*[-~]\s*(?:(\d{1,2})\s*月\s*)?(\d{1,2})\s*日"
+    )
+    for m in range_re.finditer(txt):
+        sm, sd, em, ed = m.group(1), m.group(2), m.group(3), m.group(4)
+        em = em if em else sm
+        try:
+            start = datetime.date(base_year, int(sm), int(sd))
+            end = datetime.date(base_year, int(em), int(ed))
+        except ValueError:
+            continue
+        if end < start:  # 跨年
+            end = datetime.date(base_year + 1, int(em), int(ed))
+        ranges.append((start, end))
+    if not ranges:
+        # 单日写法
+        single_re = re.compile(r"(\d{1,2})\s*月\s*(\d{1,2})\s*日")
+        for m in single_re.finditer(txt):
+            try:
+                d = datetime.date(base_year, int(m.group(1)), int(m.group(2)))
+                ranges.append((d, d))
+            except ValueError:
+                continue
+    return ranges
+
+
+def _on_leave_today(note, today):
+    """备注含'休假'且今天落在其日期区间内 → 当天免提醒；否则照常提醒。
+
+    规则：仅日期区间内的才免提醒；备注写了'休假'但解析不出日期 → 不免提醒
+    （保守提醒，避免漏填告警）。
+    """
+    if not note or "休假" not in note:
+        return False
+    try:
+        today_d = datetime.date.fromisoformat(today)
+    except ValueError:
+        return False
+    for start, end in _parse_leave_ranges(note):
+        if start <= today_d <= end:
+            return True
+    return False
+
+
 def send_app_message(token, receive_id, receive_id_type, text):
     """用自建应用给指定用户发一条飞书私信(单聊消息)。无需建群。"""
     url = f"{FEISHU_BASE}/im/v1/messages"
@@ -274,7 +336,7 @@ def main():
             print(f"[dedup] 档位 {slot} 今日已发送，跳过（防重复）")
             return
 
-    # 1) 应填名单（结合名单表「备注」：备注含"休假"当天免提醒）
+    # 1) 应填名单（结合名单表「备注」：备注含"休假"且今天落在休假日期区间内 → 当天免提醒）
     roster = list_all_records(ROSTER_APP, ROSTER_TABLE, token)
     names_raw, notes = [], {}
     for it in roster:
@@ -284,10 +346,10 @@ def main():
             continue
         names_raw.append(name)
         notes[name] = _norm(f.get("备注"))
-    # 备注含"休假"视为当天不在岗，免提醒
-    on_leave = {n for n in names_raw if "休假" in (notes.get(n) or "")}
+    # 仅当天落在备注休假日期区间内才免提醒；区间外（含休假但无日期）照常提醒
+    on_leave = {n for n in names_raw if _on_leave_today(notes.get(n) or "", today)}
     expected = sorted(set(names_raw) - on_leave - {""})
-    print(f"[info] 名单 {len(names_raw)} 条，应提醒 {len(expected)} 人，休假免提醒 {len(on_leave)} 人：{sorted(on_leave)}")
+    print(f"[info] 名单 {len(names_raw)} 条，应提醒 {len(expected)} 人，休假(日期内)免提醒 {len(on_leave)} 人：{sorted(on_leave)}")
 
     # 2) 已填（当天）
     filled = get_filled_names_today(token, today)
@@ -300,10 +362,10 @@ def main():
         msg = (f"【客户经理日志未填提醒】{today_label} 有 {len(unfilled)} 人未填\n"
                f"{lines}")
         if on_leave:
-            msg += f"\n\n（备注含“休假”免提醒 {len(on_leave)} 人：{', '.join(sorted(on_leave))}）"
+            msg += f"\n\n（休假(日期内)免提醒 {len(on_leave)} 人：{', '.join(sorted(on_leave))}）"
         msg += "\n\n请尽快在飞书补填今日日志。"
     else:
-        extra = f"（备注含“休假”免提醒 {len(on_leave)} 人）" if on_leave else ""
+        extra = f"（休假(日期内)免提醒 {len(on_leave)} 人）" if on_leave else ""
         msg = f"✅ {today_label} 客户经理日志全员已填（应填 {len(expected)} 人）{extra}。"
 
     print(msg)  # 同时写进 Actions 日志，方便排查

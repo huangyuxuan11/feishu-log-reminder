@@ -8,6 +8,7 @@
   2. 读取「客户经理日志统计」多维表格，筛选当天(填写日期==今天)的记录
   3. 把当天所有填报记录导出为 Excel（列：填写日期/客户经理姓名/工作时间1/工作内容1/工作时间2/工作内容2…，时段成对交叉）
   4. 通过飞书自建应用，把 Excel 作为文件私信发给你（亦非fan）
+  5. 同时把同一份 Excel 额外发到飞书群「秦淮政企小龙虾测试」（bot 须为群成员；群发送失败不影响私信）
 
 环境变量(放 GitHub Secrets)：
   FEISHU_APP_ID          飞书自建应用 app_id
@@ -16,6 +17,7 @@
   FEISHU_USER_ID         可选，留空即可
 
 注意：发文件需要应用具备 im:resource 权限（文件上传）+ im:message + im:message:send_as_bot。
+      发群消息需要 bot 为群成员（已在「秦淮政企小龙虾测试」群内），群 chat_id 见 GROUP_CHAT_ID。
 """
 
 import os
@@ -32,6 +34,10 @@ LOG_TABLE = "tblAQ9ZGEkAmBgTT"
 
 FEISHU_BASE = "https://open.feishu.cn/open-apis"
 BJT = datetime.timezone(datetime.timedelta(hours=8))
+
+# 导出后额外发送到的飞书群（测试群）。用 bot 身份发送，故 bot 须为群成员。
+GROUP_CHAT_ID = "oc_010b9e28bfa8459e835896b6c28ad456"  # 秦淮政企小龙虾测试
+GROUP_CHAT_NAME = "秦淮政企小龙虾测试"
 
 
 def get_tenant_token(app_id, app_secret):
@@ -288,8 +294,8 @@ def upload_file(token, file_bytes, file_name):
     return resp["data"]["file_key"]
 
 
-def send_file_message(token, open_id, file_key):
-    url = f"{FEISHU_BASE}/im/v1/messages?receive_id_type=open_id"
+def send_file_message(token, open_id, file_key, receive_id_type="open_id"):
+    url = f"{FEISHU_BASE}/im/v1/messages?receive_id_type={receive_id_type}"
     body = {
         "receive_id": open_id,
         "msg_type": "file",
@@ -299,8 +305,8 @@ def send_file_message(token, open_id, file_key):
     return r.json()
 
 
-def send_text_message(token, open_id, text):
-    url = f"{FEISHU_BASE}/im/v1/messages?receive_id_type=open_id"
+def send_text_message(token, open_id, text, receive_id_type="open_id"):
+    url = f"{FEISHU_BASE}/im/v1/messages?receive_id_type={receive_id_type}"
     body = {
         "receive_id": open_id,
         "msg_type": "text",
@@ -338,6 +344,12 @@ def main():
         print(msg)
         resp = send_text_message(token, open_id, msg)
         print("text 返回:", resp)
+        # 同时发到测试群（fail-open，不影响私信）
+        try:
+            g = send_text_message(token, GROUP_CHAT_ID, msg, receive_id_type="chat_id")
+            print("group text 返回:", g)
+        except Exception as e:
+            print(f"[warn] 群发送失败(不影响私信): {e}")
         if slot is not None:
             mark_slot_fired(token, "export", today, slot)
         return
@@ -347,12 +359,22 @@ def main():
     file_key = upload_file(token, buf.getvalue(), file_name)
     print(f"[info] 文件已上传 file_key={file_key}")
 
-    # 先发一句说明，再发文件
+    # 先发一句说明，再发文件（私信给你）
     intro = f"📊 {today_label} 客户经理日志导出（共 {len(records)} 条填报），见附件Excel。"
     send_text_message(token, open_id, intro)
     resp = send_file_message(token, open_id, file_key)
     print("file 返回:", resp)
     print(f"✅ 已发送 {file_name}")
+
+    # 同时发一份到「秦淮政企小龙虾测试」群（fail-open，不影响私信）
+    try:
+        send_text_message(token, GROUP_CHAT_ID, intro, receive_id_type="chat_id")
+        g = send_file_message(token, GROUP_CHAT_ID, file_key, receive_id_type="chat_id")
+        print("group file 返回:", g)
+        print(f"✅ 已发送至群「{GROUP_CHAT_NAME}」")
+    except Exception as e:
+        print(f"[warn] 群发送失败(不影响私信): {e}")
+
     if slot is not None:
         mark_slot_fired(token, "export", today, slot)
 

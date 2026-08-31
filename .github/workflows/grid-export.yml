@@ -1,0 +1,23 @@
+name: 网格长拜访日志周导出
+
+# 仅由飞书多维表格自动化（每周一 08:00 北京时间）经 workflow_dispatch 触发。
+# 不启用 GitHub 自带 schedule，避免与飞书自动化重复触发。
+on:
+  workflow_dispatch:
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: 安装依赖
+        run: pip install -r requirements.txt
+      - name: 运行网格长周导出并飞书推送
+        env:
+          FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
+          FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
+          FEISHU_USER_OPEN_ID: ${{ secrets.FEISHU_USER_OPEN_ID }}
+        run: python grid_export.py

@@ -232,6 +232,17 @@ def build_excel(records, today_label):
         headers.append(f"工作时间{n}")
         headers.append(f"工作内容{n}")
 
+    # 新增：集团客户拜访 / 专线·异网商机 结构化字段
+    NEW_FIELDS = [
+        "专线业务拜访集团1", "专线业务拜访集团2",
+        "集团1拜访联系人", "集团2拜访联系人",
+        "集团1支撑需求", "集团2支撑需求",
+        "集团1在用运营商", "集团2在用运营商",
+        "集团1异网到期时间", "集团2异网到期时间",
+        "集团1异网业务资费(元/月)", "集团2异网业务资费(元/月)",
+    ]
+    headers.extend(NEW_FIELDS)
+
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "客户经理日志"
@@ -255,6 +266,8 @@ def build_excel(records, today_label):
         for n in range(1, max_n + 1):
             row_vals.append(_norm(f.get(f"工作时间{n}")))
             row_vals.append(_norm(f.get(f"工作内容{n}")))
+        for key in NEW_FIELDS:
+            row_vals.append(_norm(f.get(key)))
         for c, v in enumerate(row_vals, 1):
             cell = ws.cell(row=r, column=c, value=v)
             cell.alignment = Alignment(vertical="top", wrap_text=True)
@@ -268,6 +281,12 @@ def build_excel(records, today_label):
         ccol = tcol + 1
         ws.column_dimensions[openpyxl.utils.get_column_letter(tcol)].width = 16
         ws.column_dimensions[openpyxl.utils.get_column_letter(ccol)].width = 40
+
+    # 新增字段列默认宽度
+    start_new = 3 + 2 * max_n
+    for off in range(len(NEW_FIELDS)):
+        col = start_new + off
+        ws.column_dimensions[openpyxl.utils.get_column_letter(col)].width = 24
 
     ws.freeze_panes = "C2"
 
